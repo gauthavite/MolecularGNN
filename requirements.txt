@@ -6,6 +6,7 @@ plotly
 matplotlib
 xgboost
 lightgbm
+catboost
 seaborn 
 ase
 ipywidgets
