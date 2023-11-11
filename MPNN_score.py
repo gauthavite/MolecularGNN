@@ -19,6 +19,7 @@ def load_arrays():
     print("Loading the arrays ...")
     nodes_test     = np.load(FOLDER_DIR + "nodes_test.npy" )
     in_edges_test  = np.load(FOLDER_DIR + "in_edges_test.npy")
+    in_edges_test  = in_edges_test.reshape(-1,in_edges_test.shape[1]*in_edges_test.shape[2],in_edges_test.shape[3])
 
     with open(FOLDER_DIR + "normalization_params.json", "r") as f:
         normalization_params = json.load(f)

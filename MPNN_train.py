@@ -1,6 +1,5 @@
 from tqdm import tqdm
 import numpy as np
-import json
 
 from preprocessed.array_generator import array_generator, NB_FEATURES_EDGE, NB_FEATURES_NODE
 
@@ -23,7 +22,7 @@ BATCH_SIZE = 16
 OUT_INT_DIM = 512
 STATE_DIM = 128
 T = 4
-SAVE = False
+SAVE = True
 SAVE_NAME = "./models/mpnn.pt"
 
 def load_arrays():
