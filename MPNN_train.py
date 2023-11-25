@@ -14,16 +14,20 @@ FOLDER_DIR = "./preprocessed/"
 
 # Training params
 RATIO_TRAIN_VAL = 0.8
-N_EPOCHS = 30
+N_EPOCHS = 40
 LEARNING_RATE = 0.001
 BATCH_SIZE = 16
+MPNN_TYPE = "GRU"
 
 # Model params
 OUT_INT_DIM = 512
 STATE_DIM = 128
 T = 4
 SAVE = True
-SAVE_NAME = "./models/mpnn.pt"
+SAVE_NAME = "./models/MPNN_GRU.pt"
+
+torch.manual_seed(7954501528462238601)
+np.random.seed(42)
 
 def load_arrays():
     nodes_train     = np.load(FOLDER_DIR + "nodes_train.npy" )
@@ -42,7 +46,8 @@ except FileNotFoundError:
 
 # Load the model
 print("Instantiating the model ...")
-mpnn = MPNN(nb_features_node = NB_FEATURES_NODE, nb_features_edge = NB_FEATURES_EDGE, out_int_dim = OUT_INT_DIM, state_dim = STATE_DIM, T = T)
+mpnn = MPNN(nb_features_node = NB_FEATURES_NODE, nb_features_edge = NB_FEATURES_EDGE, out_int_dim = OUT_INT_DIM, state_dim = STATE_DIM, T = T, mpnn_type=MPNN_TYPE)
+print("The MPNN type is:", MPNN_TYPE)
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print("Device is :", device)
 mpnn = mpnn.to(device)

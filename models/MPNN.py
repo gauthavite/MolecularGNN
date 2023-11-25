@@ -1,10 +1,37 @@
 import torch
 import torch.nn as nn
 
-
-class Message_Passer_NNM(nn.Module):
+class Basic_Aggregator(nn.Module):
     def __init__(self, node_dim, nb_features):
-        super(Message_Passer_NNM, self).__init__()
+        super(Basic_Aggregator, self).__init__()
+        self.node_dim = node_dim
+
+
+    def forward(self, node_j, edge_ij):   
+        size = node_j.shape[1]
+        A = torch.ones((size, size), device=node_j.device)
+
+        messages = torch.matmul(A, node_j)
+        messages = messages.view(-1, edge_ij.shape[1], self.node_dim)
+        return messages
+
+class Basic_Combiner(nn.Module):
+    def __init__(self, state_dim):
+        super(Basic_Combiner, self).__init__()
+        self.state_dim = state_dim
+        self.nn = nn.Sequential(
+                    nn.Linear(in_features=state_dim, out_features=state_dim),
+                    nn.ReLU()
+                )
+                
+    def forward(self, old_state, agg_messages):
+        # The old state is already taken into account in the agg_messages, because it is included in the "neightbours"
+        activation = self.nn(agg_messages)
+        return activation
+    
+class GRU_Aggregator(nn.Module):
+    def __init__(self, node_dim, nb_features):
+        super(GRU_Aggregator, self).__init__()
         self.nb_features = nb_features
         self.node_dim = node_dim
         self.nn = nn.Sequential(
@@ -25,19 +52,11 @@ class Message_Passer_NNM(nn.Module):
         messages = messages.view(-1, edge_ij.shape[1], self.node_dim)
 
         return messages
-    
-    
-class Message_Agg(nn.Module):
-    def __init__(self):
-        super(Message_Agg, self).__init__()
-    
-    def forward(self, messages):
-        return torch.sum(messages, 2)
 
 
-class Update_Func_GRU(nn.Module):
+class GRU_Combiner(nn.Module):
     def __init__(self, state_dim):
-        super(Update_Func_GRU, self).__init__()
+        super(GRU_Combiner, self).__init__()
         self.state_dim = state_dim
         self.GRU = nn.GRU(input_size=state_dim, hidden_size=state_dim, batch_first=True)
         
@@ -56,10 +75,43 @@ class Update_Func_GRU(nn.Module):
         return activation[:, -1, :].view(-1, n_nodes, self.state_dim)
     
 
+class MP_Layer(nn.Module):
+    def __init__(self, state_dim, nb_features_edge, mpnn_type):
+        super(MP_Layer, self).__init__()
+        
+        if mpnn_type == "GRU":
+            self.aggregator = GRU_Aggregator(node_dim=state_dim, nb_features=nb_features_edge)
+            self.combiner = GRU_Combiner(state_dim=state_dim)
+        elif mpnn_type == "basic":
+            self.aggregator = Basic_Aggregator(node_dim=state_dim, nb_features=nb_features_edge)
+            self.combiner = Basic_Combiner(state_dim=state_dim)
+        elif mpnn_type == "MGC":
+            raise TypeError(f"{mpnn_type=} argument is inappropriate.")
+        else:
+            raise TypeError(f"{mpnn_type=} argument is inappropriate.")
+        
+
+    def forward(self, nodes, edges, mask):
+        n_nodes = nodes.shape[1]
+        node_dim = nodes.shape[2]
+
+        state_j = nodes.repeat(1, n_nodes, 1)
+        messages = self.aggregator(state_j, edges)
+
+        # Multiply messages by the mask to ignore messages from non-existent nodes
+        masked = messages * mask
+        masked = masked.view(messages.shape[0], n_nodes, n_nodes, node_dim)
+
+        agg_m = torch.sum(masked, 2)
+        nodes_out = self.combiner(nodes, agg_m)
+        # Maybe add a batch norm.
+        return nodes_out
+
+
 # Define the final output layer 
-class Edge_Regressor(nn.Module):
+class Readout(nn.Module):
     def __init__(self, state_dim, nb_features_edge, intermediate_dim):
-        super(Edge_Regressor, self).__init__()
+        super(Readout, self).__init__()
         
         self.hidden_layer_1 = nn.Sequential(
                     nn.Linear(2*state_dim + nb_features_edge, intermediate_dim),
@@ -85,35 +137,10 @@ class Edge_Regressor(nn.Module):
         activation_2 = self.hidden_layer_2(activation_1)
 
         return self.output_layer(activation_2)
-    
-
-class MP_Layer(nn.Module):
-    def __init__(self, state_dim, nb_features_edge):
-        super(MP_Layer, self).__init__()
         
-        self.message_passers = Message_Passer_NNM(node_dim=state_dim, nb_features=nb_features_edge)
-        self.message_aggs = Message_Agg()
-        self.update_functions = Update_Func_GRU(state_dim=state_dim)
-
-    def forward(self, nodes, edges, mask):
-        n_nodes = nodes.shape[1]
-        node_dim = nodes.shape[2]
-
-        state_j = nodes.repeat(1, n_nodes, 1)
-        messages = self.message_passers(state_j, edges)
-
-        # Multiply messages by the mask to ignore messages from non-existent nodes
-        masked = messages * mask
-        masked = masked.view(messages.shape[0], n_nodes, n_nodes, node_dim)
-
-        agg_m = self.message_aggs(masked)
-        nodes_out = self.update_functions(nodes, agg_m)
-        # Maybe add a batch norm.
-        return nodes_out
-    
 
 class MPNN(nn.Module):
-    def __init__(self, nb_features_node, nb_features_edge, out_int_dim, state_dim, T):
+    def __init__(self, nb_features_node, nb_features_edge, out_int_dim, state_dim, T, mpnn_type="GRU"):
         super(MPNN, self).__init__()
 
         self.T = T
@@ -121,8 +148,8 @@ class MPNN(nn.Module):
                 nn.Linear(nb_features_node, state_dim),
                 nn.ReLU()
         )
-        self.MP = MP_Layer(state_dim, nb_features_edge)
-        self.edge_regressor = Edge_Regressor(state_dim, nb_features_edge, out_int_dim)
+        self.MP = MP_Layer(state_dim, nb_features_edge, mpnn_type=mpnn_type)
+        self.readout = Readout(state_dim, nb_features_edge, out_int_dim)
         self.relu = nn.ReLU()
 
     def forward(self, edges, nodes):
@@ -139,10 +166,10 @@ class MPNN(nn.Module):
         nodes = self.embed(nodes)
 
         # Run the T message-passing steps
-        for mp in range(self.T):
+        for _ in range(self.T):
             nodes = self.MP(nodes, edges, mask)
 
         # Regress the output values
-        con_edges = self.edge_regressor(nodes, edges)
+        con_edges = self.readout(nodes, edges)
 
         return con_edges

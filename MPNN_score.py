@@ -11,9 +11,10 @@ from preprocessed.array_generator import array_generator, NB_FEATURES_EDGE, NB_F
 OUT_INT_DIM = 512
 STATE_DIM = 128
 T = 4
+MPNN_TYPE = "GRU"
 
 FOLDER_DIR = "./preprocessed/"
-MODEL_PATH = "./models/mpnn.pt"
+MODEL_PATH = "./models/MPNN_GRU.pt"
 
 def load_arrays():
     print("Loading the arrays ...")
@@ -35,7 +36,7 @@ except FileNotFoundError:
 scale_norm = normalization_params["scale_norm"]
 scale_mid = normalization_params["scale_mid"]
 
-model = MPNN(nb_features_node = NB_FEATURES_NODE, nb_features_edge = NB_FEATURES_EDGE, out_int_dim = OUT_INT_DIM, state_dim = STATE_DIM, T = T)
+model = MPNN(nb_features_node = NB_FEATURES_NODE, nb_features_edge = NB_FEATURES_EDGE, out_int_dim = OUT_INT_DIM, state_dim = STATE_DIM, T = T, mpnn_type=MPNN_TYPE)
 model.load_state_dict(torch.load(MODEL_PATH))
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 model.to(device)
