@@ -80,6 +80,34 @@ def make_out_edges(train_df, n_train, max_size):
 
     return out_edges_train
 
+def make_three_bonds_adjacency_matrix(train_bonds, test_bonds, n_train, n_test, max_size):
+    """Creates an adjacency matrix that considers an edge if two atoms are fewer than 3 bonds apart."""
+    adjacency_train = np.zeros((n_train, max_size, max_size), dtype=bool)
+    adjacency_test = np.zeros((n_test, max_size, max_size), dtype=bool)
+    
+    final_adjacencies = []
+
+    for adjacency, df_bonds in zip([adjacency_train, adjacency_test], [train_bonds, test_bonds]):
+        # First iteration
+        adjacency[df_bonds["molecule_index"], df_bonds["atom_index_0"], df_bonds["atom_index_1"]] = 1
+        adjacency[df_bonds["molecule_index"], df_bonds["atom_index_1"], df_bonds["atom_index_0"]] = 1
+
+        # Two bonds or one bond
+        two_bonds_away = np.matmul(adjacency, adjacency)
+        combined_adjacency = np.logical_or(adjacency, two_bonds_away)
+
+        # We make sure that an atom is not linked to itself
+        molecule_ind, atom_ind = np.arange(len(adjacency))[:, None, None], np.arange(max_size)
+        combined_adjacency[molecule_ind, atom_ind, atom_ind] = False
+
+        # Three bonds or less
+        three_bonds_away = np.matmul(adjacency, combined_adjacency)
+        fully_combined_adjacency = np.logical_or(combined_adjacency, three_bonds_away)
+        fully_combined_adjacency[molecule_ind, atom_ind, atom_ind] = False
+
+        final_adjacencies.append(fully_combined_adjacency.astype(np.float32))
+
+    return final_adjacencies
 
 def array_generator():
     print("Generating arrays ...")
@@ -150,17 +178,23 @@ def array_generator():
     nodes_train, nodes_test = make_nodes(train_structures_df, test_structures_df, n_train, n_test, max_size)
     np.save(FOLDER_DIR + "nodes_train", nodes_train)
     np.save(FOLDER_DIR + "nodes_test", nodes_test)
-    print("nodes_train and nodes_test created")
+    print("nodes_train and nodes_test created.")
 
     in_edges_train, in_edges_test = make_in_edges(train_df, test_df, train_structures_df, test_structures_df, train_bonds, test_bonds, train_angles, test_angles, n_train, n_test, max_size)
     np.save(FOLDER_DIR + "in_edges_train", in_edges_train)
     np.save(FOLDER_DIR + "in_edges_test", in_edges_test)
-    print("in_edges_train and in_edges_test created")
+    print("in_edges_train and in_edges_test created.")
 
     out_edges_train = make_out_edges(train_df, n_train, max_size)
     np.save(FOLDER_DIR + "out_edges_train", out_edges_train)
-    print("out_edges_train created")
+    print("out_edges_train created.")
+
+    adjacency_train, adjacency_test = make_three_bonds_adjacency_matrix(train_bonds, test_bonds, n_train, n_test, max_size)
+    np.save(FOLDER_DIR + "three_bonds_adjacency_train", adjacency_train)
+    np.save(FOLDER_DIR + "three_bonds_adjacency_test", adjacency_test)
+    print("Adjacency matrices for three-bond connections created.")
 
     with open(FOLDER_DIR + "normalization_params.json", "w") as f:
         json.dump({"scale_mid":scale_mid, 
                    "scale_norm":scale_norm}, f)
+        
