@@ -31,11 +31,11 @@ where $n$ is the number of SCC that we want to predict, $y_i$ is the true value 
 
 We use a dataset taken from a Kaggle competition (Predicting Molecular Properties - Can you measure the magnetic interactions between a pair of atoms?). Our analysis will be based on two files from this dataset: $\texttt{train.csv}$ and $\texttt{structures.csv}$, which together represent 85012 unique molecules.
 
-We perform some feature engineering in the files $\texttt{make\_dataset.ipynb}$, $\texttt{BondFeatures.ipynb}$, and $\texttt{make\_angle\_dataframe.ipynb}$.
+We perform some feature engineering in the files $\texttt{make_dataset.ipynb}$, $\texttt{BondFeatures.ipynb}$, and $\texttt{make_angle_dataframe.ipynb}$.
 
 ### Baseline 
 
-An XGBoost baseline can be found in the file  $\texttt{xgb\_baseline.ipynb}$.
+An XGBoost baseline can be found in the file  $\texttt{xgb_baseline.ipynb}$.
 
 ### Training 
 
