@@ -47,7 +47,7 @@ python MPNN_train.py
 
 It will launch the training with the parameters specified at the beginning of the file.
 
-You can then the following command to see the score (log MAE) of the MPNN.
+You can then run the following command to compute the score of the trained MPNN.
 
 ```bash
 python MPNN_score.py
